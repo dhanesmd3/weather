@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cek Cuaca BMKG</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: linear-gradient(160deg, #e0f2fe 0%, #bfdbfe 50%, #ddd6fe 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px 60px;
+    }
+    header { text-align: center; margin-bottom: 36px; }
+    header h1 {
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 700;
+      color: #1e3a5f;
+    }
+    header p { margin-top: 6px; font-size: 0.95rem; color: #4a6fa5; }
+    .search-box { display: flex; gap: 10px; width: 100%; max-width: 520px; margin-bottom: 36px; }
+    .search-box input {
+      flex: 1;
+      padding: 14px 18px;
+      border: 2px solid #bfdbfe;
+      border-radius: 14px;
+      font-size: 1rem;
+      background: rgba(255,255,255,0.85);
+      color: #1e3a5f;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-box input:focus { border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59,130,246,0.15); }
+    .search-box input::placeholder { color: #94a3b8; }
+    .search-box button {
+      padding: 14px 22px;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 14px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      white-space: nowrap;
+    }
+    .search-box button:hover { background: #1d4ed8; }
+    .search-box button:active { transform: scale(0.97); }
+    #content { width: 100%; max-width: 520px; }
+    .status-msg {
+      text-align: center;
+      padding: 20px;
+      font-size: 1rem;
+      color: #4a6fa5;
+      background: rgba(255,255,255,0.6);
+      border-radius: 16px;
+      border: 1.5px solid rgba(255,255,255,0.8);
+    }
+    .status-msg.error { color: #b91c1c; background: rgba(254,226,226,0.7); border-color: #fca5a5; }
+    .weather-card {
+      background: rgba(255,255,255,0.75);
+      backdrop-filter: blur(12px);
+      border: 1.5px solid rgba(255,255,255,0.9);
+      border-radius: 24px;
+      padding: 32px 28px;
+      animation: fadeIn 0.4s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .city-name { font-size: 1.5rem; font-weight: 700; color: #1e3a5f; margin-bottom: 4px; }
+    .city-sub { font-size: 0.85rem; color: #64748b; margin-bottom: 24px; }
+    .main-display { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+    .weather-icon { font-size: 4rem; line-height: 1; }
+    .temperature { font-size: 4rem; font-weight: 700; color: #1e3a5f; line-height: 1; }
+    .temperature span { font-size: 1.8rem; color: #4a6fa5; }
+    .weather-desc { font-size: 1.1rem; color: #334155; font-weight: 500; margin-bottom: 24px; }
+    .divider { height: 1px; background: linear-gradient(90deg, transparent, #bfdbfe, transparent); margin-bottom: 24px; }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .detail-item { background: rgba(239,246,255,0.7); border-radius: 14px; padding: 14px 16px; border: 1px solid rgba(191,219,254,0.6); }
+    .detail-label { font-size: 0.78rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+    .detail-value { font-size: 1.15rem; font-weight: 600; color: #1e3a5f; }
+    .forecast-section { margin-top: 20px; }
+    .forecast-title { font-size: 0.82rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+    .forecast-list { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+    .forecast-item { flex: 0 0 auto; background: rgba(239,246,255,0.7); border: 1px solid rgba(191,219,254,0.6); border-radius: 14px; padding: 12px 14px; text-align: center; min-width: 70px; }
+    .forecast-time { font-size: 0.78rem; color: #64748b; margin-bottom: 6px; }
+    .forecast-icon { font-size: 1.5rem; margin-bottom: 4px; }
+    .forecast-temp { font-size: 0.9rem; font-weight: 600; color: #1e3a5f; }
+    footer { margin-top: 40px; font-size: 0.8rem; color: #6b7280; text-align: center; }
+    footer a { color: #3b82f6; text-decoration: none; }
+    @media (max-width: 480px) { .weather-card { padding: 24px 18px; } .temperature, .weather-icon { font-size: 3rem; } }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>&#127780; Cuaca Indonesia</h1>
+  <p>Data resmi dari BMKG &middot; Prakiraan Cuaca Digital</p>
+</header>
+
+<div class="search-box">
+  <input type="text" id="cityInput" placeholder="Ketik nama kota, mis: Bandung" autocomplete="off" />
+  <button onclick="cekCuaca()">Cek Cuaca</button>
+</div>
+
+<div id="content">
+  <div class="status-msg">&#128269; Masukkan nama kota untuk melihat prakiraan cuaca.</div>
+</div>
+
+<footer>
+  Sumber data: <a href="https://data.bmkg.go.id" target="_blank">BMKG Open Data</a> &middot; Prakiraan 3 harian
+</footer>
+
+<script>
+// ============================================================
+// KONFIGURASI
+// ============================================================
+
+// Proxy CORS: browser tidak boleh langsung request ke domain lain.
+// corsproxy.io bertindak sebagai perantara (relay) agar request kita diterima.
+const PROXY = "https://api.allorigins.win/raw?url=";
+const BMKG_URL = "https://data.bmkg.go.id/DataMKG/MEWS/DigitalForecast/DigitalForecast-DKIJakarta.xml";
+
+// Di dalam fetch:
+const response = await fetch(PROXY + encodeURIComponent(BMKG_URL));
+// ============================================================
+// PETA KODE CUACA -> TEKS & EMOJI
+// Kode ini adalah standar WMO (World Meteorological Organization)
+// ============================================================
+const CUACA_MAP = {
+  0:  { label: "Cerah",               icon: "☀️"  },
+  1:  { label: "Cerah Berawan",       icon: "🌤️" },
+  2:  { label: "Cerah Berawan",       icon: "🌤️" },
+  3:  { label: "Berawan",             icon: "⛅"  },
+  4:  { label: "Berawan Tebal",       icon: "☁️"  },
+  5:  { label: "Udara Kabur",         icon: "🌫️" },
+  10: { label: "Asap",                icon: "🌫️" },
+  45: { label: "Berkabut",            icon: "🌁"  },
+  60: { label: "Hujan Ringan",        icon: "🌦️" },
+  61: { label: "Hujan Sedang",        icon: "🌧️" },
+  63: { label: "Hujan Lebat",         icon: "🌧️" },
+  80: { label: "Hujan Lokal",         icon: "🌦️" },
+  95: { label: "Hujan Petir",         icon: "⛈️"  },
+  97: { label: "Hujan Lebat + Petir", icon: "⛈️"  },
+};
+
+// Fungsi bantu: ubah kode angka ke objek {label, icon}
+function getLabelCuaca(kode) {
+  return CUACA_MAP[kode] || { label: "Kondisi " + kode, icon: "🌡️" };
+}
+
+// ============================================================
+// FUNGSI UTAMA - dipanggil saat tombol "Cek Cuaca" diklik
+// ============================================================
+async function cekCuaca() {
+  // Ambil dan bersihkan nilai input
+  const kota = document.getElementById("cityInput").value.trim();
+  if (!kota) {
+    tampilkanError("⚠️ Silakan ketik nama kota terlebih dahulu.");
+    return;
+  }
+
+  tampilkanLoading();
+
+  try {
+    // Kirim permintaan HTTP ke URL BMKG melalui proxy
+    // encodeURIComponent() memastikan URL aman dikirim sebagai parameter
+    const response = await fetch(PROXY + encodeURIComponent(BMKG_URL));
+    if (!response.ok) throw new Error("HTTP Error: " + response.status);
+
+    // Ambil seluruh isi respons sebagai teks (format XML)
+    const xmlText = await response.text();
+
+    // Parse teks XML menjadi dokumen DOM (seperti halaman HTML biasa)
+    // sehingga kita bisa menggunakan querySelector, getAttribute, dll.
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+
+    // Periksa jika XML tidak valid (ada error parsing)
+    if (xmlDoc.querySelector("parsererror")) {
+      throw new Error("Gagal mem-parsing XML dari BMKG.");
+    }
+
+    // Cari data untuk kota yang diinput
+    const hasilData = cariKota(xmlDoc, kota);
+
+    if (hasilData) {
+      tampilkanHasil(hasilData);
+    } else {
+      tampilkanError(
+        "🏙️ Kota <strong>" + kota + "</strong> tidak ditemukan.<br>" +
+        "<small>Coba nama lain: Jakarta, Surabaya, Bandung, Medan, Makassar...</small>"
+      );
+    }
+
+  } catch (err) {
+    console.error("Detail error:", err);
+    tampilkanError(
+      "❌ Gagal memuat data. Periksa koneksi internet Anda.<br>" +
+      "<small style='opacity:0.7'>" + err.message + "</small>"
+    );
+  }
+}
+
+// ============================================================
+// FUNGSI PARSING XML
+// Mencari elemen <area> yang cocok, lalu ekstrak semua data cuaca
+// ============================================================
+function cariKota(xmlDoc, namaKota) {
+  // querySelectorAll("area") mengambil SEMUA elemen <area> dalam XML
+  // XML BMKG punya ratusan <area>, satu per kota/kabupaten
+  const semuaArea = xmlDoc.querySelectorAll("area");
+  const kotaLower = namaKota.toLowerCase();
+  let areaYangCocok = null;
+
+  for (const area of semuaArea) {
+    // Atribut description="Nama Kota" ada di setiap <area>
+    const deskripsi = (area.getAttribute("description") || "").toLowerCase();
+    if (deskripsi.includes(kotaLower)) {
+      areaYangCocok = area;
+      break; // Berhenti di hasil pertama yang cocok
+    }
+  }
+
+  if (!areaYangCocok) return null;
+
+  const namaResmi = areaYangCocok.getAttribute("description");
+
+  // Fungsi bantu: cari parameter berdasarkan id-nya,
+  // lalu ambil <value> pertama (= prakiraan waktu pertama / saat ini)
+  function getValueParam(idParam) {
+    const params = areaYangCocok.querySelectorAll("parameter");
+    for (const p of params) {
+      if (p.getAttribute("id") === idParam) {
+        // <parameter> berisi beberapa <timerange>, kita ambil yg pertama
+        return p.querySelector("timerange value");
+      }
+    }
+    return null;
+  }
+
+  // Ambil nilai masing-masing parameter cuaca
+  const elSuhu       = getValueParam("t");       // t = temperature
+  const elKelembapan = getValueParam("hu");      // hu = humidity
+  const elCuaca      = getValueParam("weather"); // weather = kode cuaca
+  const elAngin      = getValueParam("ws");      // ws = wind speed
+  const elArahAngin  = getValueParam("wd_to");   // wd_to = wind direction
+
+  const suhu       = elSuhu       ? elSuhu.textContent         : "N/A";
+  const kelembapan = elKelembapan ? elKelembapan.textContent + "%" : "N/A";
+  const kodeCuaca  = elCuaca      ? parseInt(elCuaca.textContent, 10) : 0;
+  const angin      = elAngin      ? elAngin.textContent + " km/h"     : "N/A";
+  const arahAngin  = elArahAngin  ? elArahAngin.textContent            : "N/A";
+  const infoCuaca  = getLabelCuaca(kodeCuaca);
+
+  // Ambil prakiraan beberapa slot waktu ke depan
+  const prakiraan = [];
+  const paramCuacaEl = [...areaYangCocok.querySelectorAll("parameter")]
+    .find(p => p.getAttribute("id") === "weather");
+  const paramSuhuEl  = [...areaYangCocok.querySelectorAll("parameter")]
+    .find(p => p.getAttribute("id") === "t");
+
+  if (paramCuacaEl) {
+    const timeranges = paramCuacaEl.querySelectorAll("timerange");
+    for (let i = 0; i < Math.min(6, timeranges.length); i++) {
+      const tr  = timeranges[i];
+      // Format datetime di BMKG: YYYYMMDDHHMMSS
+      // Karakter index 8 & 9 = jam (HH)
+      const jam = (tr.getAttribute("datetime") || "00000000000000").slice(8, 10) + ":00";
+      const kode = parseInt(tr.querySelector("value")?.textContent || "0", 10);
+      const info = getLabelCuaca(kode);
+      const suhuSlot = paramSuhuEl
+        ?.querySelectorAll("timerange")[i]
+        ?.querySelector("value")?.textContent || "--";
+      prakiraan.push({ jam, icon: info.icon, suhu: suhuSlot });
+    }
+  }
+
+  return { nama: namaResmi, suhu, kelembapan, angin, arahAngin, cuacaIcon: infoCuaca.icon, cuacaLabel: infoCuaca.label, prakiraan };
+}
+
+// ============================================================
+// FUNGSI-FUNGSI TAMPILAN
+// ============================================================
+function tampilkanLoading() {
+  document.getElementById("content").innerHTML =
+    '<div class="status-msg">⏳ Mengambil data cuaca dari BMKG...</div>';
+}
+
+function tampilkanError(pesan) {
+  document.getElementById("content").innerHTML =
+    '<div class="status-msg error">' + pesan + '</div>';
+}
+
+function tampilkanHasil(data) {
+  // Buat HTML untuk tiap slot prakiraan
+  const prakirHtml = data.prakiraan.map(function(p) {
+    return '<div class="forecast-item">' +
+      '<div class="forecast-time">' + p.jam + '</div>' +
+      '<div class="forecast-icon">' + p.icon + '</div>' +
+      '<div class="forecast-temp">' + p.suhu + '°</div>' +
+      '</div>';
+  }).join("");
+
+  const forecastSection = data.prakiraan.length > 0
+    ? '<div class="forecast-section"><div class="forecast-title">⏱️ Prakiraan per waktu</div><div class="forecast-list">' + prakirHtml + '</div></div>'
+    : "";
+
+  // Gunakan innerHTML untuk menyuntikkan kartu cuaca ke halaman
+  document.getElementById("content").innerHTML =
+    '<div class="weather-card">' +
+      '<div class="city-name">' + esc(data.nama) + '</div>' +
+      '<div class="city-sub">📍 Indonesia &middot; BMKG</div>' +
+      '<div class="main-display">' +
+        '<div class="weather-icon">' + data.cuacaIcon + '</div>' +
+        '<div class="temperature">' + esc(data.suhu) + '<span>°C</span></div>' +
+      '</div>' +
+      '<div class="weather-desc">' + esc(data.cuacaLabel) + '</div>' +
+      '<div class="divider"></div>' +
+      '<div class="detail-grid">' +
+        '<div class="detail-item"><div class="detail-label">💧 Kelembapan</div><div class="detail-value">' + esc(data.kelembapan) + '</div></div>' +
+        '<div class="detail-item"><div class="detail-label">💨 Kec. Angin</div><div class="detail-value">' + esc(data.angin) + '</div></div>' +
+        '<div class="detail-item"><div class="detail-label">🧭 Arah Angin</div><div class="detail-value">' + esc(data.arahAngin) + '</div></div>' +
+        '<div class="detail-item"><div class="detail-label">🌡️ Kondisi</div><div class="detail-value" style="font-size:0.95rem">' + esc(data.cuacaLabel) + '</div></div>' +
+      '</div>' +
+      forecastSection +
+    '</div>';
+}
+
+// Fungsi sanitasi sederhana untuk mencegah XSS (serangan injeksi kode)
+function esc(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+// Tekan Enter = sama dengan klik tombol
+document.getElementById("cityInput").addEventListener("keydown", function(e) {
+  if (e.key === "Enter") cekCuaca();
+});
+</script>
+</body>
+</html>
